@@ -30,7 +30,7 @@ laser_towers = []
 weak_enemies = []
 walls = []
 wall_mode = False
-in_main_menu = False
+in_main_menu = True
 
 core_rect = pygame.Rect(360, 250, 60, 60)
 
