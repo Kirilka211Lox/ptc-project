@@ -13,7 +13,6 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Protect the Core")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("consolas", 22, bold=True)
-title_font = pygame.font.SysFont("consolas", 44, bold=True)
 
 COLOR_BG = (18, 22, 28)
 COLOR_CORE = (34, 39, 82)
@@ -29,11 +28,14 @@ max_laser_range = 200
 laser_towers = []
 weak_enemies = []
 walls = []
+hit_sparks = []
 wall_mode = False
 in_main_menu = True
+spawn_timer = 0
+spawn_interval = 90
 
 core_rect = pygame.Rect(360, 250, 60, 60)
-play_btn_rect = pygame.Rect(SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT // 2 - 20, 220, 54)
+play_btn_rect = pygame.Rect(320, 200, 160, 40)
 
 
 def add_laser_tower(x, y, health=100):
@@ -50,9 +52,35 @@ def spawn_weak_enemy(x, y, health=50, speed=1.5):
         "x": float(x - 10),
         "y": float(y - 10),
         "health": health,
-        "speed": speed
+        "speed": speed,
+        "hurt": 0
     }
     weak_enemies.append(enemy_info)
+
+
+def spawn_random_edge_enemy():
+    side = random.choice(["top", "bottom", "left", "right"])
+    if side == "top":
+        x = random.randint(0, SCREEN_WIDTH)
+        y = -10
+    elif side == "bottom":
+        x = random.randint(0, SCREEN_WIDTH)
+        y = SCREEN_HEIGHT + 10
+    elif side == "left":
+        x = -10
+        y = random.randint(0, SCREEN_HEIGHT)
+    else:
+        x = SCREEN_WIDTH + 10
+        y = random.randint(0, SCREEN_HEIGHT)
+    spawn_weak_enemy(x, y)
+
+
+def add_hit_spark(pos):
+    hit_sparks.append({
+        "x": pos[0] + random.randint(-6, 6),
+        "y": pos[1] + random.randint(-6, 6),
+        "life": 4
+    })
 
 
 def add_wall(x, y, health=1000):
@@ -65,7 +93,7 @@ def add_wall(x, y, health=1000):
 
 def handle_menu_event(event):
     global in_main_menu
-    if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+    if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
         in_main_menu = False
     elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
         if play_btn_rect.collidepoint(event.pos):
@@ -74,14 +102,17 @@ def handle_menu_event(event):
 
 def handle_game_event(event):
     global wall_mode, in_main_menu
+    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+        in_main_menu = True
+        return
+    if health_core <= 0:
+        return
     if event.type == pygame.KEYDOWN:
         if event.key == pygame.K_e:
             mx, my = pygame.mouse.get_pos()
             spawn_weak_enemy(mx, my)
         elif event.key == pygame.K_w:
             wall_mode = not wall_mode
-        elif event.key == pygame.K_ESCAPE:
-            in_main_menu = True
     elif event.type == pygame.MOUSEBUTTONDOWN:
         if event.button == 1:
             if wall_mode:
@@ -103,9 +134,20 @@ def handle_game_event(event):
 
 
 def update_game():
-    global coins, health_core
+    global coins, health_core, spawn_timer
+
+    if health_core <= 0:
+        return
+
+    spawn_timer += 1
+    if spawn_timer >= spawn_interval:
+        spawn_timer = 0
+        spawn_random_edge_enemy()
 
     for enemy in weak_enemies[:]:
+        if enemy["hurt"] > 0:
+            enemy["hurt"] -= 1
+
         angle = math.atan2(core_rect.centery - enemy["rect"].centery,
                            core_rect.centerx - enemy["rect"].centerx)
         #wallhitx
@@ -152,6 +194,12 @@ def update_game():
                 if tower["health"] <= 0:
                     laser_towers.remove(tower)
                 break
+
+    for s in hit_sparks[:]:
+        s["life"] -= 1
+        if s["life"] <= 0:
+            hit_sparks.remove(s)
+
 #awfully done enemy separation i'll never do it again i spent like 2 hours on this :cry:
     cell_size = 40
     grid = {}
@@ -205,19 +253,11 @@ def update_game():
 
 def draw_menu():
     screen.fill(COLOR_BG)
-    pygame.draw.rect(screen, COLOR_CORE, core_rect, border_radius=5)
-    pygame.draw.rect(screen, COLOR_CORE_INNER, (370, 260, 40, 40), border_radius=5)
-
-    title_surf = title_font.render("PROTECT THE CORE", True, (235, 240, 250))
-    screen.blit(title_surf, title_surf.get_rect(center=(SCREEN_WIDTH // 2, 145)))
-
-    hover = play_btn_rect.collidepoint(pygame.mouse.get_pos())
-    btn_color = (65, 85, 130) if hover else (42, 54, 82)
-    pygame.draw.rect(screen, btn_color, play_btn_rect, border_radius=8)
-    pygame.draw.rect(screen, (130, 155, 205), play_btn_rect, 2, border_radius=8)
-
-    label_surf = font.render("PLAY (ENTER)", True, (245, 248, 255))
-    screen.blit(label_surf, label_surf.get_rect(center=play_btn_rect.center))
+    txt = font.render("menu", True, (200, 200, 200))
+    screen.blit(txt, (375, 140))
+    pygame.draw.rect(screen, (60, 60, 80), play_btn_rect)
+    btn_txt = font.render("play", True, (255, 255, 255))
+    screen.blit(btn_txt, (378, 208))
 
 
 def draw_game():
@@ -233,7 +273,8 @@ def draw_game():
     #testinglasertowers ok now its drawing stuff not only lasertowers
 
     for enemy in weak_enemies:
-        pygame.draw.rect(screen, COLOR_ENEMY, enemy["rect"])
+        col = (255, 255, 255) if enemy["hurt"] > 0 else COLOR_ENEMY
+        pygame.draw.rect(screen, col, enemy["rect"])
 
     for wall in walls:
         pygame.draw.rect(screen, COLOR_WALL, wall["rect"])
@@ -264,12 +305,20 @@ def draw_game():
                 #inlasesr
                 pygame.draw.line(screen, (255, 200, 200), start_pos, end_pos, 1)
                 #---_rect.clipline - clippin with enemis
-                for enemy in weak_enemies[:]:
-                    if enemy["rect"].clipline(start_pos, end_pos):
-                        enemy["health"] -= 3
-                        if enemy["health"] <= 0:
-                            weak_enemies.remove(enemy)
-                            coins += 5
+                if health_core > 0:
+                    for enemy in weak_enemies[:]:
+                        clipped = enemy["rect"].clipline(start_pos, end_pos)
+                        if clipped:
+                            enemy["health"] -= 3
+                            enemy["hurt"] = 2
+                            add_hit_spark(clipped[0])
+                            if enemy["health"] <= 0:
+                                weak_enemies.remove(enemy)
+                                coins += 5
+
+    for s in hit_sparks:
+        pygame.draw.rect(screen, (255, 255, 0), (s["x"], s["y"], 3, 3))
+
     if health_core <= 0:
         win_surf = font.render("lost", True, COLOR_LASER)
         banner_rect = win_surf.get_rect(center=(SCREEN_WIDTH // 2, 30))
@@ -282,4 +331,28 @@ def draw_game():
     screen.blit(hp_core_surf, banner2_rect)
 
     pygame.draw.rect(screen, COLOR_CORE, (360, 250, 60, 60), border_radius=5)
-    pygame.
+    pygame.draw.rect(screen, COLOR_CORE_INNER, (370, 260, 40, 40), border_radius=5)
+
+
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            continue
+        if in_main_menu:
+            handle_menu_event(event)
+        else:
+            handle_game_event(event)
+
+    if in_main_menu:
+        draw_menu()
+    else:
+        update_game()
+        draw_game()
+
+    pygame.display.flip()
+    clock.tick(FPS)
+
+pygame.quit()
+sys.exit()
