@@ -13,6 +13,7 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Protect the Core")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("consolas", 22, bold=True)
+title_font = pygame.font.SysFont("consolas", 44, bold=True)
 
 COLOR_BG = (18, 22, 28)
 COLOR_CORE = (34, 39, 82)
