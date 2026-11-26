@@ -24,7 +24,7 @@ COLOR_WALL = (110, 120, 135)
 
 coins = 0
 health_core = 100
-max_laser_range = 200
+max_laser_range = 100
 laser_towers = []
 weak_enemies = []
 walls = []
@@ -113,24 +113,12 @@ def handle_game_event(event):
             spawn_weak_enemy(mx, my)
         elif event.key == pygame.K_w:
             wall_mode = not wall_mode
-    elif event.type == pygame.MOUSEBUTTONDOWN:
-        if event.button == 1:
+        elif event.key == pygame.K_q:
+            mx, my = pygame.mouse.get_pos()
             if wall_mode:
-                add_wall(event.pos[0], event.pos[1])
+                add_wall(mx, my)
             else:
-                add_laser_tower(event.pos[0], event.pos[1])
-        elif event.button == 3:
-            removed = False
-            for wall in walls[:]:
-                if wall["rect"].collidepoint(event.pos):
-                    walls.remove(wall)
-                    removed = True
-                    break
-            if not removed:
-                for tower in laser_towers[:]:
-                    if tower["rect"].collidepoint(event.pos):
-                        laser_towers.remove(tower)
-                        break
+                add_laser_tower(mx, my)
 
 
 def update_game():
@@ -282,23 +270,20 @@ def draw_game():
     for tower in laser_towers:
         pygame.draw.rect(screen, COLOR_LASER_TOWER, tower["rect"])
 
-    #laser draw
-    connections = [0] * len(laser_towers)
+ #laser draw
+    has_next = [False] * len(laser_towers)
+    has_prev = [False] * len(laser_towers)
     for i in range(len(laser_towers)):
-        #keep going if not second guy
-        if connections[i] >= 2:
+        if has_next[i]:
             continue
         for j in range(i + 1, len(laser_towers)):
-            #stop if second guy
-            if connections[i] >= 3:
-                break
-            if connections[j] >= 3:
+            if has_prev[j]:
                 continue
             start_pos = laser_towers[i]["rect"].center
             end_pos = laser_towers[j]["rect"].center
             if math.dist(start_pos, end_pos) <= max_laser_range:
-                connections[i] += 1
-                connections[j] += 1
+                has_next[i] = True
+                has_prev[j] = True
                 #draw laser yay difficult part done
                 #outlaser
                 pygame.draw.line(screen, COLOR_LASER, start_pos, end_pos, random.randint(3, 6))
@@ -315,6 +300,7 @@ def draw_game():
                             if enemy["health"] <= 0:
                                 weak_enemies.remove(enemy)
                                 coins += 5
+                break
 
     for s in hit_sparks:
         pygame.draw.rect(screen, (255, 255, 0), (s["x"], s["y"], 3, 3))
