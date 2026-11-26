@@ -33,6 +33,7 @@ wall_mode = False
 in_main_menu = True
 
 core_rect = pygame.Rect(360, 250, 60, 60)
+play_btn_rect = pygame.Rect(SCREEN_WIDTH // 2 - 110, SCREEN_HEIGHT // 2 - 20, 220, 54)
 
 
 def add_laser_tower(x, y, health=100):
@@ -53,6 +54,7 @@ def spawn_weak_enemy(x, y, health=50, speed=1.5):
     }
     weak_enemies.append(enemy_info)
 
+
 def add_wall(x, y, health=1000):
     wall_info = {
         "rect": pygame.Rect(x - 15, y - 15, 30, 30),
@@ -61,46 +63,47 @@ def add_wall(x, y, health=1000):
     walls.append(wall_info)
 
 
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.MOUSEBUTTONDOWN and not wall_mode:
-            if event.button == 1:
+def handle_menu_event(event):
+    global in_main_menu
+    if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_SPACE):
+        in_main_menu = False
+    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if play_btn_rect.collidepoint(event.pos):
+            in_main_menu = False
+
+
+def handle_game_event(event):
+    global wall_mode, in_main_menu
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_e:
+            mx, my = pygame.mouse.get_pos()
+            spawn_weak_enemy(mx, my)
+        elif event.key == pygame.K_w:
+            wall_mode = not wall_mode
+        elif event.key == pygame.K_ESCAPE:
+            in_main_menu = True
+    elif event.type == pygame.MOUSEBUTTONDOWN:
+        if event.button == 1:
+            if wall_mode:
+                add_wall(event.pos[0], event.pos[1])
+            else:
                 add_laser_tower(event.pos[0], event.pos[1])
-            elif event.button == 3:
+        elif event.button == 3:
+            removed = False
+            for wall in walls[:]:
+                if wall["rect"].collidepoint(event.pos):
+                    walls.remove(wall)
+                    removed = True
+                    break
+            if not removed:
                 for tower in laser_towers[:]:
                     if tower["rect"].collidepoint(event.pos):
                         laser_towers.remove(tower)
                         break
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_e:
-                mx, my = pygame.mouse.get_pos()
-                spawn_weak_enemy(mx, my)
-            elif event.key == pygame.K_w:
-                wall_mode = not wall_mode
-        if health_core <= 0:
-            health_core == 0
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                if wall_mode:
-                    add_wall(event.pos[0], event.pos[1])
-                else:
-                    add_laser_tower(event.pos[0], event.pos[1])
-            elif event.button == 3:
-                removed = False
-                for wall in walls[:]:
-                    if wall["rect"].collidepoint(event.pos):
-                        walls.remove(wall)
-                        removed = True
-                        break
-                if not removed:
-                    for tower in laser_towers[:]:
-                        if tower["rect"].collidepoint(event.pos):
-                            laser_towers.remove(tower)
-                            break
+
+def update_game():
+    global coins, health_core
 
     for enemy in weak_enemies[:]:
         angle = math.atan2(core_rect.centery - enemy["rect"].centery,
@@ -140,7 +143,7 @@ while running:
             weak_enemies.remove(enemy)
             continue
 
-        for tower in laser_towers:
+        for tower in laser_towers[:]:
             if enemy["rect"].colliderect(tower["rect"]):
                 tower["health"] -= 1
                 enemy["x"] -= math.cos(angle) * enemy["speed"] * 2
@@ -196,6 +199,30 @@ while running:
                     a["rect"].topleft = (round(a["x"]), round(a["y"]))
                     b["rect"].topleft = (round(b["x"]), round(b["y"]))
 
+    if health_core < 0:
+        health_core = 0
+
+
+def draw_menu():
+    screen.fill(COLOR_BG)
+    pygame.draw.rect(screen, COLOR_CORE, core_rect, border_radius=5)
+    pygame.draw.rect(screen, COLOR_CORE_INNER, (370, 260, 40, 40), border_radius=5)
+
+    title_surf = title_font.render("PROTECT THE CORE", True, (235, 240, 250))
+    screen.blit(title_surf, title_surf.get_rect(center=(SCREEN_WIDTH // 2, 145)))
+
+    hover = play_btn_rect.collidepoint(pygame.mouse.get_pos())
+    btn_color = (65, 85, 130) if hover else (42, 54, 82)
+    pygame.draw.rect(screen, btn_color, play_btn_rect, border_radius=8)
+    pygame.draw.rect(screen, (130, 155, 205), play_btn_rect, 2, border_radius=8)
+
+    label_surf = font.render("PLAY (ENTER)", True, (245, 248, 255))
+    screen.blit(label_surf, label_surf.get_rect(center=play_btn_rect.center))
+
+
+def draw_game():
+    global coins
+
     screen.fill(COLOR_BG)
 
     #something odd range draw
@@ -207,7 +234,7 @@ while running:
 
     for enemy in weak_enemies:
         pygame.draw.rect(screen, COLOR_ENEMY, enemy["rect"])
-        
+
     for wall in walls:
         pygame.draw.rect(screen, COLOR_WALL, wall["rect"])
 
@@ -253,13 +280,6 @@ while running:
     banner2_rect = hp_core_surf.get_rect(center=(390, 240))
     pygame.draw.rect(screen, COLOR_BG, banner2_rect.inflate(20, 10))
     screen.blit(hp_core_surf, banner2_rect)
-    
 
     pygame.draw.rect(screen, COLOR_CORE, (360, 250, 60, 60), border_radius=5)
-    pygame.draw.rect(screen, COLOR_CORE_INNER, (370, 260, 40, 40), border_radius=5)
-
-    pygame.display.flip()
-    clock.tick(FPS)
-
-pygame.quit()
-sys.exit()
+    pygame.
